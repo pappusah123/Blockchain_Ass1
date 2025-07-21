@@ -7,91 +7,111 @@ Original file is located at
     https://colab.research.google.com/drive/1v-AqsQoeAOQg5YlRSWfNASOxokvQTvBb
 """
 
+# Create a directory named simple_blockchain (Colab-only)
 mkdir simple_blockchain
 
+# Change to the newly created directory
 cd simple_blockchain
 
+# Create an empty Python file called blockchain.py
 open("blockchain.py", "w").close()
 
-import hashlib
-import time
-import json
-import os
+# Import required libraries
+import hashlib  # For hashing blocks
+import time     # To timestamp blocks
+import json     # For saving/loading blockchain
+import os       # To check file existence
 
 # -----------------------------
 # Block Class
 # -----------------------------
 class Block:
+    # Constructor to initialize a block
     def __init__(self, index, transactions, previous_hash, timestamp=None):
-        self.index = index
-        self.timestamp = timestamp if timestamp else time.time()
-        self.transactions = transactions
-        self.previous_hash = previous_hash
-        self.nonce = 0
-        self.hash = self.calculate_hash()
+        self.index = index  # Block number in the chain
+        self.timestamp = timestamp if timestamp else time.time()  # Set time
+        self.transactions = transactions  # List of transactions
+        self.previous_hash = previous_hash  # Hash of the previous block
+        self.nonce = 0  # Initial nonce for mining
+        self.hash = self.calculate_hash()  # Calculate current block hash
 
+    # Function to compute SHA-256 hash of the block's contents
     def calculate_hash(self):
         value = str(self.index) + str(self.timestamp) + str(self.transactions) + str(self.previous_hash) + str(self.nonce)
         return hashlib.sha256(value.encode()).hexdigest()
 
+    # Proof-of-Work algorithm to mine the block
     def mine_block(self, difficulty):
         print(f"⛏️ Mining block {self.index}...")
-        target = '0' * difficulty
+        target = '0' * difficulty  # Hash must start with 'difficulty' number of 0s
         while self.hash[:difficulty] != target:
-            self.nonce += 1
-            self.hash = self.calculate_hash()
-        print(f"✅ Block {self.index} mined with hash: {self.hash}")
+            self.nonce += 1  # Try new nonce
+            self.hash = self.calculate_hash()  # Recalculate hash
+        print(f" Block {self.index} mined with hash: {self.hash}")
 
+# Blockchain class to manage the chain and transactions
 class Blockchain:
     def __init__(self, difficulty=2, max_tx_per_block=3):
-        self.chain = []
-        self.difficulty = difficulty
-        self.pending_transactions = []
-        self.max_tx_per_block = max_tx_per_block
+        self.chain = []  # List to hold all blocks
+        self.difficulty = difficulty  # Mining difficulty
+        self.pending_transactions = []  # Transactions waiting to be mined
+        self.max_tx_per_block = max_tx_per_block  # Max transactions per block
 
+        # Load existing blockchain from file or create a genesis block
         if os.path.exists("blockchain.json"):
             self.load_chain()
         else:
             self.create_genesis_block()
 
+    # Create the first block in the blockchain
     def create_genesis_block(self):
         genesis_block = Block(0, ["Genesis Block"], "0")
-        genesis_block.mine_block(self.difficulty)
+        genesis_block.mine_block(self.difficulty)  # Mine the genesis block
         self.chain.append(genesis_block)
-        self.save_chain()
+        self.save_chain()  # Save to file
 
+    # Return the latest block in the chain
     def get_latest_block(self):
         return self.chain[-1]
 
+    # Add a transaction to the pending list
     def add_transaction(self, transaction_data):
         self.pending_transactions.append(transaction_data)
+        # If enough transactions are pending, mine them
         if len(self.pending_transactions) >= self.max_tx_per_block:
             self.mine_pending_transactions()
 
+    # Mine all pending transactions
     def mine_pending_transactions(self):
         latest_block = self.get_latest_block()
+        # Create a new block with a subset of pending transactions
         new_block = Block(len(self.chain), self.pending_transactions[:self.max_tx_per_block], latest_block.hash)
         new_block.mine_block(self.difficulty)
         self.chain.append(new_block)
+        # Remove mined transactions from pending list
         self.pending_transactions = self.pending_transactions[self.max_tx_per_block:]
-        self.save_chain()
+        self.save_chain()  # Save updated chain to file
 
+    # Check integrity and validity of the blockchain
     def is_chain_valid(self):
         for i in range(1, len(self.chain)):
             current = self.chain[i]
             previous = self.chain[i - 1]
 
+            # Check if hash matches computed hash
             if current.hash != current.calculate_hash():
-                print(f"⚠️ Tampering detected at block {current.index}!")
+                print(f" Tampering detected at block {current.index}!")
                 return False
 
+            # Check if current block links correctly to previous
             if current.previous_hash != previous.hash:
-                print(f"⚠️ Block {current.index} not linked properly!")
+                print(f" Block {current.index} not linked properly!")
                 return False
 
-        print("✅ Blockchain is valid.")
+        print(" Blockchain is valid.")
         return True
 
+    # Print all blocks in the chain
     def display_chain(self):
         for block in self.chain:
             print(f"Index: {block.index}")
@@ -101,15 +121,18 @@ class Blockchain:
             print(f"Previous Hash: {block.previous_hash}")
             print("-" * 40)
 
+    # Save blockchain to a file in JSON format
     def save_chain(self):
         with open("blockchain.json", "w") as f:
             json.dump([block.__dict__ for block in self.chain], f, indent=4)
 
+    # Load blockchain from a file
     def load_chain(self):
         with open("blockchain.json", "r") as f:
             data = json.load(f)
             self.chain = []
             for block_data in data:
+                # Recreate each block from the saved data
                 block = Block(
                     block_data['index'],
                     block_data['transactions'],
@@ -120,10 +143,12 @@ class Blockchain:
                 block.hash = block_data['hash']
                 self.chain.append(block)
 
+# Main menu to interact with the blockchain
 def menu():
-    bc = Blockchain()
+    bc = Blockchain()  # Create or load blockchain
 
     while True:
+        # Display menu options
         print("\n--- Blockchain Menu ---")
         print("1. Add new transaction")
         print("2. Mine pending transactions (if any)")
@@ -133,6 +158,7 @@ def menu():
 
         choice = input("Enter your choice: ")
 
+        # Handle user choices
         if choice == '1':
             tx = input("Enter transaction data: ")
             bc.add_transaction(tx)
@@ -140,15 +166,16 @@ def menu():
             if bc.pending_transactions:
                 bc.mine_pending_transactions()
             else:
-                print("🕒 No transactions to mine.")
+                print(" No transactions to mine.")
         elif choice == '3':
             bc.display_chain()
         elif choice == '4':
             bc.is_chain_valid()
         elif choice == '5':
-            break
+            break  # Exit the program
         else:
-            print("❌ Invalid choice. Try again.")
+            print(" Invalid choice. Try again.")
 
+# Run the menu if the script is executed directly
 if __name__ == "__main__":
     menu()
